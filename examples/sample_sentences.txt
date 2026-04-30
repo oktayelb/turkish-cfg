@@ -1,0 +1,14 @@
+# Sample sentences for future parser milestones.
+#
+# Early accepted examples:
+Ali kitabı okudu
+Kitabı Ali okudu
+Ali kitap okudu
+
+# Early rejected example because P2 must be adjacent to VP:
+Kitap Ali okudu
+
+# Later izafet examples:
+Okulun kapısı açıldı
+Ali okulun kapısını gördü
+
