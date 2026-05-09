@@ -11,12 +11,14 @@ from lark.exceptions import LarkError
 from .morphology import MorphState, SavyarInterface, TokenNode
 from .tokenizer import TurkishTokenizer
 
+
 @dataclass(frozen=True)
 class Derivation:
     categories: tuple[str, ...]
     states: tuple[MorphState, ...]
     tree: Tree
     score: float
+
 
 @dataclass(frozen=True)
 class ParseResult:
@@ -29,6 +31,7 @@ class ParseResult:
     @property
     def best(self) -> Derivation | None:
         return self.derivations[0] if self.derivations else None
+
 
 class CFGParser:
     def __init__(
@@ -99,7 +102,12 @@ class CFGParser:
         state_list = list(states)
         score = sum(state.score - (state.rank * 0.001) for state in state_list)
         categories = [state.category for state in state_list]
+        
+        # Boost traditional objects and valid embedded clauses
         score += categories.count("P3") * 0.7
+        score += categories.count("VN") * 0.5
+        score += categories.count("PART") * 0.5
+        
         for index, category in enumerate(categories[:-1]):
             if categories[index + 1] == "VP":
                 if category == "P3":

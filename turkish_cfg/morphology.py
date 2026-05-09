@@ -12,6 +12,7 @@ from typing import Any, Iterable
 
 from .tokenizer import Token
 
+
 @dataclass(frozen=True)
 class MorphState:
     category: str
@@ -20,14 +21,17 @@ class MorphState:
     rank: int = 0
     score: float = 0.0
 
+
 @dataclass(frozen=True)
 class TokenNode:
     surface: str
     normalized: str
     states: list[MorphState]
 
+
 class SavyarUnavailable(RuntimeError):
     pass
+
 
 class SavyarInterface:
     """Adapter around Savyar's sentence ranker.
@@ -108,6 +112,7 @@ class SavyarInterface:
             raise SavyarUnavailable(proc.stderr.strip() or "Savyar subprocess failed")
         return json.loads(proc.stdout)
 
+
 class MorphologicalMapper:
     # Fixed syntactic case assignments to align with linguistic norms
     CASE_TO_CATEGORY = {
@@ -119,78 +124,43 @@ class MorphologicalMapper:
         "noun_compound": "GEN",
     }
     PRONOUN_CASES = {
-        "ben": "P1",
-        "sen": "P1",
-        "o": "P1",
-        "biz": "P1",
-        "siz": "P1",
-        "onlar": "P1",
-        "beni": "P3",
-        "seni": "P3",
-        "onu": "P3",
-        "bizi": "P3",
-        "sizi": "P3",
-        "bana": "P4",
-        "sana": "P4",
-        "ona": "P4",
-        "bize": "P4",
-        "size": "P4",
+        "ben": "P1", "sen": "P1", "o": "P1", "biz": "P1", "siz": "P1", "onlar": "P1",
+        "beni": "P3", "seni": "P3", "onu": "P3", "bizi": "P3", "sizi": "P3",
+        "bana": "P4", "sana": "P4", "ona": "P4", "bize": "P4", "size": "P4",
     }
+    
+    # Non-finite and adverbial suffix sets
     ADVERBIAL_SUFFIXES = {
-        "temporative_leyin",
-        "adverbial_cesine",
-        "when_ken",
-        "adverbial_erek",
-        "adverbial_ince",
-        "adverbial_ip",
-        "adverbial_e",
-        "adverbial_dikçe",
-        "since_eli",
-        "undoing_meksizin",
+        "temporative_leyin", "adverbial_cesine", "when_ken", "adverbial_erek",
+        "adverbial_ince", "adverbial_ip", "adverbial_e", "adverbial_dikçe",
+        "since_eli", "undoing_meksizin"
     }
+    VN_SUFFIXES = {
+        "infinitive_me", "infinitive_mek", "nounifier_iş"
+    }
+    PART_SUFFIXES = {
+        "factative_en", "adjectifier_dik", "nounifier_ecek", "pastfactative_miş",
+        "factative_ir", "willing_esi"
+    }
+
     FINITE_VERB_SUFFIXES = {
-        "pasttense_di",
-        "continuous_iyor",
-        "wish_suffix",
-        "pasttense_noundi",
-        "copula_mis",
-        "nounaorist_dir",
-        "if_se",
-        "conjugation_1sg",
-        "conjugation_2sg",
-        "conjugation_3sg",
-        "conjugation_1pl",
-        "conjugation_2pl",
-        "conjugation_3pl",
+        "pasttense_di", "continuous_iyor", "wish_suffix", "pasttense_noundi",
+        "copula_mis", "nounaorist_dir", "if_se", "conjugation_1sg",
+        "conjugation_2sg", "conjugation_3sg", "conjugation_1pl",
+        "conjugation_2pl", "conjugation_3pl",
     }
-    NONFINITE_VERB_TO_NOUN = {
-        "factative_en",
-        "pastfactative_miş",
-        "adjectifier_dik",
-        "nounifier_ecek",
-        "factative_ir",
-        "willing_esi",
-        "infinitive_me",
-        "infinitive_mek",
-        "nounifier_iş",
-        "toolative_ek",
-        "constofactative_gen",
-        "constofactative_gin",
-        "perfectative_ik",
-        "nounifier_i",
-        "nounifier_gi",
-        "nounifier_ge",
-        "nounifier_im",
-        "nounifier_in",
-        "nounifier_it",
-        "nounifier_inç",
-        "nounifier_inti",
-        "toolifier_geç",
-        "subjectifier_giç",
-        "nounifier_anak",
-        "nounifier_amak",
-        "subjectifier_men",
+    NONFINITE_VERB_TO_NOUN = VN_SUFFIXES | PART_SUFFIXES | {
+        "toolative_ek", "constofactative_gen", "constofactative_gin", "perfectative_ik",
+        "nounifier_i", "nounifier_gi", "nounifier_ge", "nounifier_im", "nounifier_in",
+        "nounifier_it", "nounifier_inç", "nounifier_inti", "toolifier_geç",
+        "subjectifier_giç", "nounifier_anak", "nounifier_amak", "subjectifier_men"
     }
+
+    # Lexical roots for categorical determination
+    POSTP_DAT_ROOTS = {"göre", "kadar", "rağmen", "karşı", "doğru", "dair", "nazaran", "ait", "has", "mahsus"}
+    POSTP_ABL_ROOTS = {"beri", "dolayı", "sonra", "önce", "başka", "ötürü", "itibaren", "evvel"}
+    POSTP_NOM_ROOTS = {"gibi", "ile", "için", "üzere", "boyunca", "hakkında"}
+    WH_ROOTS = {"kim", "ne", "nasıl", "neden", "niçin", "niye", "hangi", "nere", "nerede", "nereye", "nereden", "kaç", "ne_zaman"}
 
     def map_candidate(
         self,
@@ -201,13 +171,42 @@ class MorphologicalMapper:
         candidate: dict[str, Any],
     ) -> MorphState:
         suffix_names = [suffix["name"] for suffix in candidate.get("suffixes", [])]
+        root = candidate.get("root", normalized)
         root_pos = candidate.get("root_pos", "")
         final_pos = candidate.get("final_pos", "")
 
+        # Map to precise grammar terminals
         if is_question_particle or normalized in {"mı", "mi", "mu", "mü"}:
             category = "MI"
+        elif final_pos == "conj":
+            category = "CONJ"
+        elif root in self.WH_ROOTS or (root_pos == "pron" and "question" in candidate.get("typing_string", "")):
+            category = "WH"
+        elif root_pos == "postp" or final_pos == "postp":
+            if root in self.POSTP_DAT_ROOTS:
+                category = "POSTP_DAT"
+            elif root in self.POSTP_ABL_ROOTS:
+                category = "POSTP_ABL"
+            else:
+                category = "POSTP_NOM"
+        elif "copula" in candidate.get("morphology_string", "").lower() or any("copula" in s for s in suffix_names):
+            category = "COPULA"
+        elif any(s in self.VN_SUFFIXES for s in suffix_names):
+            category = "VN"
+        elif any(s in self.PART_SUFFIXES for s in suffix_names):
+            category = "PART"
+        elif any(s in self.ADVERBIAL_SUFFIXES for s in suffix_names):
+            category = "ADV"
         elif self._is_finite_verb(root_pos, suffix_names):
             category = "VP"
+        elif root_pos == "num" or final_pos == "num":
+            category = "NUM"
+        elif root_pos == "det" or (root in {"bu", "şu", "o"} and final_pos != "pron"):
+            category = "DEM"
+        elif final_pos == "adj":
+            category = "ADJ"
+        elif final_pos == "adv":
+            category = "ADV"
         elif normalized in self.PRONOUN_CASES or final_pos == "cc_pronoun":
             category = self.PRONOUN_CASES.get(normalized, "P1")
         else:
@@ -215,7 +214,7 @@ class MorphologicalMapper:
 
         return MorphState(
             category=category,
-            root=candidate.get("root", normalized),
+            root=root,
             rank=int(candidate.get("rank", 0)),
             score=float(candidate.get("score", 0.0)),
             features={
@@ -257,8 +256,6 @@ class MorphologicalMapper:
         for suffix_name in reversed(suffix_names):
             if suffix_name in self.CASE_TO_CATEGORY:
                 return self.CASE_TO_CATEGORY[suffix_name]
-        if any(name in self.ADVERBIAL_SUFFIXES for name in suffix_names):
-            return "P8"
         if any(name.startswith("possessive_") for name in suffix_names):
             return "P1"
         return "P1" if is_proper else "P2"
@@ -268,6 +265,7 @@ class MorphologicalMapper:
             if suffix_name in self.CASE_TO_CATEGORY:
                 return suffix_name
         return "nominative"
+
 
 class _DirectSavyar:
     def __init__(self, savyar_dir: Path) -> None:
