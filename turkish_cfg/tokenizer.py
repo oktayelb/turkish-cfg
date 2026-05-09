@@ -41,7 +41,9 @@ class TurkishTokenizer:
 
         for match in _TOKEN_RE.finditer(text):
             # Now safe to strip the apostrophe since the regex captured it
-            surface = _APOSTROPHE_RE.sub("", match.group(0))
+            raw_surface = match.group(0)
+            has_apostrophe = bool(_APOSTROPHE_RE.search(raw_surface))
+            surface = _APOSTROPHE_RE.sub("", raw_surface)
             if not surface:
                 continue
 
@@ -49,7 +51,11 @@ class TurkishTokenizer:
             is_question = normalized in _QUESTION_PARTICLES
             
             # Improved proper noun detection
-            is_proper = surface[:1].isupper() and not is_question
+            is_proper = (
+                surface[:1].isupper()
+                and not is_question
+                and (bool(tokens) or has_apostrophe or normalized in _COMMON_PERSON_NAMES)
+            )
 
             token = Token(
                 surface=surface,

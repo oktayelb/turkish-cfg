@@ -35,6 +35,13 @@ verbal_noun_phrase: phrase* VN_SUFFIX case_marker?
 relative_clause: phrase* PART_SUFFIX
 adverbial_clause: phrase* ADV_SUFFIX
 
+case_marker: P3
+           | P4
+           | P5
+           | P6
+           | P7
+           | GEN
+
 // 3. Phrasal Constituents
 phrase: noun_phrase
       | postpositional_phrase
